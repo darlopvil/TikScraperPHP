@@ -1,49 +1,38 @@
-# TikWrapperPHP
-A Wrapper for the TikTok API made with PHP >= 8.1
+# TikScraperPHP (fork)
 
-## How to Use
+Un wrapper en PHP ≥ 8.1 para la API web de TikTok. **Fork de [pablouser1/TikScraperPHP](https://github.com/pablouser1/TikScraperPHP)** con la capa de peticiones/firma reescrita para que vuelva a funcionar en 2026.
+
+## Qué cambia en este fork
+
+El upstream firma las peticiones con un montaje de Selenium/ChromeDriver en proceso que se quedó obsoleto cuando TikTok cambió su esquema anti-bot (ahora exige `X-Gnarly` además de `X-Bogus`). Este fork reemplaza esa capa:
+
+- **Firma vía sidecar [carcabot/tiktok-signature](https://github.com/carcabot/tiktok-signature).** `Sender::sendApi()` construye la URL de la API, la envía por POST al endpoint `/signature` del firmador y descarga el resultado con Guzzle usando la `signed_url` + cookies + UA que devuelve. Produce `X-Bogus` + `X-Gnarly` actuales.
+- **Selenium eliminado por completo.** `Stream.php` y `Downloaders/BaseDownloader.php` ya no dependen de él; `php-webdriver/webdriver` fuera del `composer.json`.
+- **Fingerprint Mac/Safari** corregido en `Helpers/Request.php` para que coincida con el navigator del firmador, más un `device_id` configurable.
+- **Preferencia de CDN:** las respuestas se post-procesan para que el `playAddr`/`downloadAddr` de cada item prefiera una URL `*.tiktokcdn*.com` del `bitrateInfo` cuando exista (las URLs `webapp-prime` están protegidas). El vídeo que no tenga variante CDN se gestiona aguas abajo (ver el sidecar yt-dlp del fork de ProxiTok).
+
+## Configuración
+
 ```php
 $api = new \TikScraper\Api([
-    'debug' => false, // Debug mode
-    'browser' => [
-        'url' => 'http://localhost:4444', // Url to your chromedriver instance
-        'close_when_done' => false, // Close chrome instance when request finishes
-    ],
-    'verify_fp' => 'verify_...', // Cookie used for skipping captcha requests
-    'device_id' => '596845...' // Custom device id
-    'user_agent' => 'YOUR_CUSTOM_USER_AGENT_HERE',
-    'proxy' => 'http://user:password@hostname:port'
+    'browser' => [ 'url' => 'http://tiktok-signer_app:8080' ], // URL base del firmador carcabot
+    'device_id' => '7520531026079925774',                      // device id de 19 dígitos
+    'verify_fp' => '',                                          // opcional
 ], $cacheEngine);
-
-$tag = $api->hashtag('funny');
-$tag->feed();
-
-if ($hastag->ok()) {
-    echo $hashtag->getFull()->toJson(true);
-} else {
-    print_r($hashtag->error());
-}
 ```
 
-## Documentation
-An initial version of the documentation is available [here](https://pablouser1.github.io/TikScraperPHP/)
+`browser.url` se reutiliza como la URL base del firmador (ya no hay ChromeDriver de por medio).
 
-## Caching
-TikScrapperPHP supports caching requests, to use it you need to implement [ICache.php](https://github.com/pablouser1/TikScraperPHP/blob/master/src/Interfaces/ICache.php)
+## Proyectos relacionados
 
-## TODO
-* Search
-* Comments
-### Left to implement from legacy
-* For the love of god, actually document everything properly this time
+- **[ProxiTok (fork)](https://github.com/darlopvil/ProxiTok)** — el frontend que consume esta librería.
+- **[carcabot/tiktok-signature](https://github.com/carcabot/tiktok-signature)** — el sidecar de firma (se ejecuta aparte).
+- **[ttdlp](https://github.com/darlopvil/ttdlp)** — sidecar yt-dlp para la reproducción real del vídeo.
 
-## Credits
-* @Sharqo78: Working TikTok downloader without watermark
+## Créditos
 
-HUGE thanks to the following projects, this wouldn't be possible without their help
+Todo el trabajo original es de [Pablo Ferreiro](https://github.com/pablouser1) y los créditos del upstream (TikTok-API-PHP, TikTok-Api, tiktok-signature, tiktok-scraper, puppeteer-extra stealth). Este fork solo cambia la capa de transporte/firma.
 
-* [puppeteer-extra-plugin-stealth](https://github.com/berstend/puppeteer-extra/blob/master/packages/puppeteer-extra-plugin-stealth), ported library to PHP
-* [TikTok-API-PHP](https://github.com/ssovit/TikTok-API-PHP)
-* [TikTok-Api](https://github.com/davidteather/TikTok-Api)
-* [tiktok-signature](https://github.com/carcabot/tiktok-signature)
-* [tiktok-scraper](https://github.com/drawrowfly/tiktok-scraper)
+## Licencia
+
+La misma que el upstream (MIT).
