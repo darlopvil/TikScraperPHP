@@ -8,7 +8,8 @@ use TikScraper\Wrappers\Signer;
 
 /**
  * Clase central de peticiones a TikTok.
- * Reescrita: firma vía sidecar carcabot (/signature) + fetch propio con Guzzle.
+ * Firma vía sidecar carcabot (/signature) + fetch propio con Guzzle.
+ * Post-procesa itemList para preferir URLs de CDN sobre webapp-prime (gated).
  */
 class Sender {
     private const WEB_URL = "https://www.tiktok.com";
@@ -51,9 +52,13 @@ class Sender {
             ]);
             $code = $res->getStatusCode();
             $body = (string) $res->getBody();
+            $json = $body === '' ? null : json_decode($body);
+            if ($json !== null) {
+                $this->preferCdn($json);
+            }
             $data["code"] = $code;
             $data["success"] = $code >= 200 && $code < 400;
-            $data["data"] = $body === '' ? null : json_decode($body);
+            $data["data"] = $json;
         } catch (\Throwable $e) {
             $data["code"] = 503;
         }
@@ -82,5 +87,60 @@ class Sender {
         }
 
         return new Response($data);
+    }
+
+    /**
+     * Reescribe playAddr/downloadAddr de cada item a una URL de CDN
+     * (sacada de bitrateInfo) cuando exista, evitando webapp-prime (403 gated).
+     */
+    private function preferCdn($json): void {
+        if (!is_object($json)) {
+            return;
+        }
+        if (isset($json->itemList) && is_array($json->itemList)) {
+            foreach ($json->itemList as $it) {
+                $this->rewriteItemVideo($it);
+            }
+        }
+        if (isset($json->itemInfo) && isset($json->itemInfo->itemStruct)) {
+            $this->rewriteItemVideo($json->itemInfo->itemStruct);
+        }
+        if (isset($json->itemStruct)) {
+            $this->rewriteItemVideo($json->itemStruct);
+        }
+    }
+
+    private function rewriteItemVideo($item): void {
+        if (!is_object($item) || !isset($item->video) || !is_object($item->video)) {
+            return;
+        }
+        $cdn = $this->bestCdnUrl($item->video);
+        if ($cdn !== null) {
+            $item->video->playAddr = $cdn;
+            $item->video->downloadAddr = $cdn;
+        }
+    }
+
+    private function bestCdnUrl($video): ?string {
+        if (!isset($video->bitrateInfo) || !is_array($video->bitrateInfo)) {
+            return null;
+        }
+        foreach ($video->bitrateInfo as $b) {
+            $pa = $b->PlayAddr ?? $b->playAddr ?? null;
+            if ($pa === null) {
+                continue;
+            }
+            $list = $pa->UrlList ?? $pa->urlList ?? null;
+            if (!is_array($list)) {
+                continue;
+            }
+            foreach ($list as $u) {
+                $host = parse_url($u, PHP_URL_HOST);
+                if ($host && strpos($host, 'tiktokcdn') !== false) {
+                    return $u;
+                }
+            }
+        }
+        return null;
     }
 }
