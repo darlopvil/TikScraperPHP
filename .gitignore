@@ -3,3 +3,4 @@
 .phpdoc
 .phpunit.result.cache
 /docs
+/.venv

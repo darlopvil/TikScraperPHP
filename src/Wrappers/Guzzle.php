@@ -4,16 +4,23 @@ use GuzzleHttp\Client;
 
 /**
  * Wrapper de GuzzleHTTP autónomo (ya no depende de Selenium).
- * Hace las peticiones reales a TikTok con la signed_url + cookies + UA del firmador.
+ * UA por defecto para Stream/Downloader; Sender lo sobreescribe por request
+ * con el user_agent que devuelve el firmador.
  */
 class Guzzle {
     private Client $client;
+    const DEFAULT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
     function __construct(array $config) {
         $httpConfig = [
-            'timeout' => 10.0,
+            'timeout' => 15.0,
             'http_errors' => false,
-            'allow_redirects' => true
+            'allow_redirects' => true,
+            'headers' => [
+                'User-Agent' => (isset($config['user_agent']) && $config['user_agent'] !== '')
+                    ? $config['user_agent']
+                    : self::DEFAULT_UA
+            ]
         ];
         if (isset($config['proxy']) && $config['proxy'] !== '') {
             $httpConfig['proxy'] = $config['proxy'];

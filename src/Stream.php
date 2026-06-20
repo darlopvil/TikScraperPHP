@@ -4,7 +4,6 @@ use GuzzleHttp\Exception\ConnectException;
 use Psr\Http\Message\ResponseInterface;
 use TikScraper\Helpers\Tokens;
 use TikScraper\Wrappers\Guzzle;
-use TikScraper\Wrappers\Selenium;
 
 /**
  * Video streaming class.
@@ -12,30 +11,21 @@ use TikScraper\Wrappers\Selenium;
  */
 class Stream {
     private const BUFFER_SIZE = 1024;
-    // Headers to forward back to client, to be filled with response header values from TikTok
     private array $headers_to_forward = [
         'Content-Type' => null,
         'Content-Length' => null,
         'Content-Range' => null,
-        // Always send this one to explicitly say we accept ranged requests
         'Accept-Ranges' => 'bytes'
     ];
 
     private Tokens $tokens;
-    private Selenium $selenium;
     private Guzzle $guzzle;
 
     public function __construct(array $config = []) {
         $this->tokens = new Tokens($config);
-        $this->selenium = new Selenium($config, $this->tokens);
-        $this->guzzle = new Guzzle($config, $this->selenium);
+        $this->guzzle = new Guzzle($config);
     }
 
-    /**
-     * Streams selected url
-     * @param string $url
-     * @return void
-     */
     public function url(string $url): void {
         $client = $this->guzzle->getClient();
 
