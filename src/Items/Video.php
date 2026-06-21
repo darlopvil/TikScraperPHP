@@ -17,21 +17,27 @@ class Video extends Base {
     }
 
     public function info(): self {
-        $subdomain = '';
-        $endpoint = '';
         if (is_numeric($this->term)) {
-            $subdomain = 'm';
-            $endpoint = '/v/' . $this->term;
+            // ID numérico: detalle por API firmada, SIN raspar HTML → mata el reto WAF.
+            // preferCdn() en Sender ya reescribe itemInfo->itemStruct al CDN automáticamente.
+            $req = $this->sender->sendApi('/item/detail/', [
+                "itemId" => $this->term
+            ], "/");
+
+            $info = Info::fromReq($req);
+            if ($info->meta->success && isset($req->jsonBody->itemInfo->itemStruct)) {
+                $this->item = $req->jsonBody->itemInfo->itemStruct;
+                $info->setDetail($this->item->author);
+                $info->setStats($this->item->stats);
+            }
         } else {
-            $subdomain = 'www';
-            $endpoint = '/t/' . $this->term;
-        }
+            // Short link /t/<code>: sin itemId → se queda el rehydrate HTML como fallback.
+            $req = $this->sender->sendHTML('/t/' . $this->term, 'www');
 
-        $req = $this->sender->sendHTML($endpoint, $subdomain);
-
-        $info = Info::fromReq($req);
-        if ($info->meta->success) {
-            if ($req->hasRehidrate() && isset($req->rehidrateState->__DEFAULT_SCOPE__->{'webapp.video-detail'})) {
+            $info = Info::fromReq($req);
+            if ($info->meta->success
+                && $req->hasRehidrate()
+                && isset($req->rehidrateState->__DEFAULT_SCOPE__->{'webapp.video-detail'})) {
                 $root = $req->rehidrateState->__DEFAULT_SCOPE__->{'webapp.video-detail'};
                 $this->item = $root->itemInfo->itemStruct;
                 $info->setDetail($this->item->author);
