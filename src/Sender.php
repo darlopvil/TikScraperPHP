@@ -19,8 +19,10 @@ class Sender {
     private Tokens $tokens;
     private Signer $signer;
     private Guzzle $guzzle;
+    private array $config;
 
     function __construct(array $config) {
+        $this->config = $config;
         $this->tokens = new Tokens($config);
         $this->signer = new Signer($config);
         $this->guzzle = new Guzzle($config);
@@ -88,6 +90,29 @@ class Sender {
 
         return new Response($data);
     }
+
+    /**
+     * Llama al sidecar ttdlp (yt-dlp) y devuelve el JSON decodificado o null.
+     * Se usa para listar el feed de usuario (/post/item_list/ está WAF-capado).
+     */
+    public function sidecar(string $endpoint, array $query = []): ?object {
+        $base = rtrim($this->config['ttdlp_url'] ?? 'http://ttdlp_app:8080', '/');
+        $url = $base . $endpoint . '?' . http_build_query($query);
+        try {
+            $res = $this->guzzle->getClient()->get($url, [
+                'headers' => ['Accept' => 'application/json'],
+                'timeout' => 95
+            ]);
+            if ($res->getStatusCode() !== 200) {
+                return null;
+            }
+            $json = json_decode((string) $res->getBody());
+            return is_object($json) ? $json : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
 
     /**
      * Reescribe playAddr/downloadAddr de cada item a una URL de CDN
