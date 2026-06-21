@@ -54,17 +54,18 @@ class Meta {
                 return;
             }
 
-            $scope = $res->rehidrateState->__DEFAULT_SCOPE__;
-            $root = null;
+           $scope = $res->rehidrateState->__DEFAULT_SCOPE__;
+            // Acepta tanto la página de vídeo como la de perfil
+            $root = $scope->{"webapp.video-detail"} ?? $scope->{"webapp.user-detail"} ?? null;
 
-            if (!isset($res->rehidrateState->__DEFAULT_SCOPE__->{"webapp.video-detail"})) {
+            if ($root === null) {
                 // Response doesn't have valid data
                 $this->setState($res->http_success, Codes::STATE_DECODE_ERROR->value, "");
                 return;
             }
 
-            $root = $res->rehidrateState->__DEFAULT_SCOPE__->{"webapp.video-detail"};
-            $this->setState($res->http_success, $root->statusCode, $root->statusMsg);
+            // user-detail no trae statusCode/statusMsg → 0/"" (éxito si HTTP ok)
+            $this->setState($res->http_success, $root->statusCode ?? 0, $root->statusMsg ?? "");
 
             $this->setOgIfExists($root);
         }
