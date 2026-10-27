@@ -15,8 +15,11 @@ class Hashtag extends Base {
     }
 
     public function info(): self {
+        // $this->term ya viene urlencodeado (Base) y buildQuery vuelve a codificar: sin
+        // decodificar, un hashtag no ASCII (#indonesia🇮🇩, #españa) llegaba doble codificado
+        // y TikTok respondía 10205 (no existe).
         $req = $this->sender->sendApi("/challenge/detail/", [
-            "challengeName" => $this->term
+            "challengeName" => urldecode($this->term)
         ], "/tag/" . $this->term);
 
         $info = Info::fromReq($req);
