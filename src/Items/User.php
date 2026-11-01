@@ -39,6 +39,13 @@ class User extends Base {
         if ($this->infoOk()) {
             $preloaded = $this->handleFeedCache();
             if (!$preloaded) {
+                // Cuenta sin vídeos (la info SSR ya lo dice): no se le pide nada a yt-dlp, que
+                // tardaría ~1,3 s en rendirse con "does not have any videos posted".
+                if (isset($this->info->stats->videoCount) && (int) $this->info->stats->videoCount === 0) {
+                    $this->feed = Feed::fromObj((object) ["items" => [], "hasMore" => false, "cursor" => $cursor]);
+                    return $this;
+                }
+
                 // /post/item_list/ devuelve 200 vacío (WAF-capado). Listamos el perfil con yt-dlp vía ttdlp.
                 $count = 30;
                 $res = $this->sender->sidecar('/user', [
